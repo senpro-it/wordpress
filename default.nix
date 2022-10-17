@@ -105,6 +105,19 @@ in
 
     system.activationScripts =
       let
+        applyWordpressPHPSettings = opts: name:
+          ''
+            if grep -Fxq "php_value upload_max_filesize 100M" /srv/podman/wordpress/volume.d/${name}/wordpress/.htaccess && \
+               grep -Fxq "php_value post_max_size 100M" /srv/podman/wordpress/volume.d/${name}/wordpress/.htaccess
+            then
+              echo "PHP settings already applied to /srv/podman/wordpress/volume.d/${name}/wordpress/.htaccess"
+            else
+              printf '%s\n' \
+              "php_value upload_max_filesize 100M" \
+              "php_value post_max_size 100M" \
+              >> /srv/podman/wordpress/volume.d/${name}/wordpress/.htaccess
+            fi
+          '';
         createWordpressTraefikNetwork = opts: name:
           ''
             ${pkgs.podman}/bin/podman network create wordpress-${name}
@@ -137,7 +150,8 @@ in
             > /srv/podman/traefik/volume.d/traefik/conf.d/wordpress-${name}.yml
           '';
       in listToAttrs (
-        (map (name: { name = "create${name}WordpressTraefikNetwork"; value = createWordpressTraefikNetwork (builtins.getAttr name cfg) name; }) (builtins.attrNames cfg))
+        (map (name: { name = "apply${name}WordpressPHPSettings"; value = applyWordpressPHPSettings (builtins.getAttr name cfg) name; }) (builtins.attrNames cfg))
+        ++ (map (name: { name = "create${name}WordpressTraefikNetwork"; value = createWordpressTraefikNetwork (builtins.getAttr name cfg) name; }) (builtins.attrNames cfg))
         ++ (map (name: { name = "make${name}WordpressBindVolDirectories"; value = makeWordpressBindVolDirectories (builtins.getAttr name cfg) name; }) (builtins.attrNames cfg))
         ++ (map (name: { name = "make${name}WordpressMariaDBBindVolDirectories"; value = makeWordpressMariaDBBindVolDirectories (builtins.getAttr name cfg) name; }) (builtins.attrNames cfg))
         ++ (map (name: { name = "make${name}WordpressTraefikConfiguration"; value = makeWordpressTraefikConfiguration (builtins.getAttr name cfg) name; }) (builtins.attrNames cfg))
